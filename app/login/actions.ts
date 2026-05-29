@@ -1,0 +1,51 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+
+export async function login(formData: FormData) {
+  const supabase = await createClient();
+
+  const credentials = {
+    email: String(formData.get("email") ?? ""),
+    password: String(formData.get("password") ?? ""),
+  };
+
+  const { error } = await supabase.auth.signInWithPassword(credentials);
+
+  if (error) {
+    redirect(`/login?error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath("/", "layout");
+  redirect("/");
+}
+
+export async function signup(formData: FormData) {
+  const supabase = await createClient();
+
+  const credentials = {
+    email: String(formData.get("email") ?? ""),
+    password: String(formData.get("password") ?? ""),
+  };
+
+  const { error } = await supabase.auth.signUp(credentials);
+
+  if (error) {
+    redirect(`/login?error=${encodeURIComponent(error.message)}`);
+  }
+
+  redirect(
+    `/login?message=${encodeURIComponent(
+      "Conta criada! Verifique seu e-mail para confirmar (se a confirmação estiver ativada) e depois entre.",
+    )}`,
+  );
+}
+
+export async function logout() {
+  const supabase = await createClient();
+  await supabase.auth.signOut();
+  revalidatePath("/", "layout");
+  redirect("/login");
+}
