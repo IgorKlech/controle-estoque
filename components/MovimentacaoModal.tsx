@@ -34,7 +34,7 @@ export default function MovimentacaoModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm rounded-2xl border border-neutral-200 bg-white p-6 shadow-lg dark:border-neutral-800 dark:bg-neutral-900"
+        className="max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-2xl border border-neutral-200 bg-white p-6 shadow-lg dark:border-neutral-800 dark:bg-neutral-900"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-lg font-bold text-neutral-900 dark:text-neutral-50">
@@ -69,6 +69,30 @@ export default function MovimentacaoModal({
             />
           </label>
 
+          {ehEntrada ? (
+            <div className="grid grid-cols-2 gap-3">
+              <label className="flex flex-col gap-1 text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                Lote (opcional)
+                <input
+                  type="text"
+                  name="codigo"
+                  maxLength={60}
+                  placeholder="Ex: L2026-04"
+                  className={campo}
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                Validade (opcional)
+                <input type="date" name="validade" className={campo} />
+              </label>
+            </div>
+          ) : (
+            <p className="rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+              A baixa é automática por <strong>FEFO</strong>: sai primeiro o lote
+              que vence antes.
+            </p>
+          )}
+
           <label className="flex flex-col gap-1 text-sm font-medium text-neutral-700 dark:text-neutral-300">
             Motivo
             <select name="motivo" defaultValue={motivos[0]} className={campo}>
@@ -87,12 +111,7 @@ export default function MovimentacaoModal({
 
           <label className="flex flex-col gap-1 text-sm font-medium text-neutral-700 dark:text-neutral-300">
             Observação (opcional)
-            <input
-              type="text"
-              name="observacao"
-              maxLength={200}
-              className={campo}
-            />
+            <input type="text" name="observacao" maxLength={200} className={campo} />
           </label>
 
           {state && !state.ok && (

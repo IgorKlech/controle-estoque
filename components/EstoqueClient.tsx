@@ -1,20 +1,39 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { EstoqueItem, TipoMovimentacao } from "@/lib/types";
+import type { EstoqueItem, LoteItem, TipoMovimentacao } from "@/lib/types";
 import MovimentacaoModal from "./MovimentacaoModal";
 import CadastroModal from "./CadastroModal";
+import LotesModal from "./LotesModal";
 import MinimoEditavel from "./MinimoEditavel";
+import { formatarValidade } from "@/lib/datas";
 
 type ModalState = { item: EstoqueItem; tipo: TipoMovimentacao } | null;
-type Filtro = "todos" | "alerta";
+type Filtro = "todos" | "alerta" | "vencimento";
 
-export default function EstoqueClient({ itens }: { itens: EstoqueItem[] }) {
+export default function EstoqueClient({
+  itens,
+  lotes,
+}: {
+  itens: EstoqueItem[];
+  lotes: LoteItem[];
+}) {
   const [busca, setBusca] = useState("");
   const [categoria, setCategoria] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const [modal, setModal] = useState<ModalState>(null);
   const [cadastroAberto, setCadastroAberto] = useState(false);
+  const [lotesDe, setLotesDe] = useState<EstoqueItem | null>(null);
+
+  const lotesPorEmbalagem = useMemo(() => {
+    const map = new Map<string, LoteItem[]>();
+    for (const l of lotes) {
+      const arr = map.get(l.embalagem_id) ?? [];
+      arr.push(l);
+      map.set(l.embalagem_id, arr);
+    }
+    return map;
+  }, [lotes]);
 
   const categorias = useMemo(
     () =>
@@ -28,6 +47,7 @@ export default function EstoqueClient({ itens }: { itens: EstoqueItem[] }) {
     const termo = busca.trim().toLowerCase();
     return itens.filter((i) => {
       if (filtro === "alerta" && !i.abaixo_minimo) return false;
+      if (filtro === "vencimento" && !i.tem_vencido && !i.vence_90) return false;
       if (categoria && i.categoria !== categoria) return false;
       if (
         termo &&
@@ -62,6 +82,10 @@ export default function EstoqueClient({ itens }: { itens: EstoqueItem[] }) {
     () => itens.filter((i) => i.abaixo_minimo).length,
     [itens],
   );
+  const totalVencimento = useMemo(
+    () => itens.filter((i) => i.tem_vencido || i.vence_90).length,
+    [itens],
+  );
 
   function exportarCSV() {
     const cab = [
@@ -73,6 +97,7 @@ export default function EstoqueClient({ itens }: { itens: EstoqueItem[] }) {
       "Minimo",
       "Categoria",
       "Abaixo do minimo",
+      "Proxima validade",
     ];
     const linhas = filtrados.map((i) => [
       i.produto,
@@ -83,6 +108,7 @@ export default function EstoqueClient({ itens }: { itens: EstoqueItem[] }) {
       i.estoque_minimo,
       i.categoria ?? "",
       i.abaixo_minimo ? "SIM" : "",
+      i.proxima_validade ?? "",
     ]);
     baixarCSV("estoque", [cab, ...linhas]);
   }
@@ -91,9 +117,9 @@ export default function EstoqueClient({ itens }: { itens: EstoqueItem[] }) {
     <div>
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Card titulo="Produtos" valor={totalProdutos} />
-        <Card titulo="Embalagens (SKUs)" valor={itens.length} />
-        <Card titulo="Unidades em estoque" valor={totalUnidades} />
+        <Card titulo="Unidades" valor={totalUnidades} />
         <Card titulo="Abaixo do mínimo" valor={totalAlerta} alerta={totalAlerta > 0} />
+        <Card titulo="Validade crítica" valor={totalVencimento} alerta={totalVencimento > 0} />
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -118,27 +144,23 @@ export default function EstoqueClient({ itens }: { itens: EstoqueItem[] }) {
             ))}
           </select>
         )}
-        <button
-          onClick={() => setFiltro(filtro === "alerta" ? "todos" : "alerta")}
-          className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
-            filtro === "alerta"
-              ? "border-amber-500 bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200"
-              : "border-neutral-300 text-neutral-700 hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
-          }`}
-        >
-          ⚠ Só alertas
-        </button>
+        <FiltroBtn ativo={filtro === "alerta"} onClick={() => setFiltro(filtro === "alerta" ? "todos" : "alerta")}>
+          ⚠ Estoque baixo
+        </FiltroBtn>
+        <FiltroBtn ativo={filtro === "vencimento"} onClick={() => setFiltro(filtro === "vencimento" ? "todos" : "vencimento")}>
+          ⏰ Validade
+        </FiltroBtn>
         <button
           onClick={exportarCSV}
           className="rounded-lg border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
         >
-          ↓ Exportar CSV
+          ↓ CSV
         </button>
         <button
           onClick={() => setCadastroAberto(true)}
           className="rounded-lg bg-neutral-900 px-3 py-2 text-sm font-medium text-white transition hover:bg-neutral-700 dark:bg-neutral-50 dark:text-neutral-900 dark:hover:bg-neutral-200"
         >
-          + Cadastrar produto
+          + Produto
         </button>
       </div>
 
@@ -148,9 +170,9 @@ export default function EstoqueClient({ itens }: { itens: EstoqueItem[] }) {
             <tr>
               <th className="px-4 py-3 font-medium">Produto / Embalagem</th>
               <th className="px-4 py-3 font-medium">Tipo</th>
-              <th className="px-4 py-3 text-right font-medium">Capac.</th>
               <th className="px-4 py-3 text-right font-medium">Estoque</th>
               <th className="px-4 py-3 text-right font-medium">Mínimo</th>
+              <th className="px-4 py-3 font-medium">Validade</th>
               <th className="px-4 py-3 text-right font-medium">Ações</th>
             </tr>
           </thead>
@@ -169,6 +191,7 @@ export default function EstoqueClient({ itens }: { itens: EstoqueItem[] }) {
                 categoria={lista[0]?.categoria ?? null}
                 lista={lista}
                 onMovimentar={(item, tipo) => setModal({ item, tipo })}
+                onVerLotes={(item) => setLotesDe(item)}
               />
             ))}
           </tbody>
@@ -185,6 +208,13 @@ export default function EstoqueClient({ itens }: { itens: EstoqueItem[] }) {
       {cadastroAberto && (
         <CadastroModal onClose={() => setCadastroAberto(false)} />
       )}
+      {lotesDe && (
+        <LotesModal
+          item={lotesDe}
+          lotes={lotesPorEmbalagem.get(lotesDe.embalagem_id) ?? []}
+          onClose={() => setLotesDe(null)}
+        />
+      )}
     </div>
   );
 }
@@ -194,11 +224,13 @@ function ProdutoBloco({
   categoria,
   lista,
   onMovimentar,
+  onVerLotes,
 }: {
   produto: string;
   categoria: string | null;
   lista: EstoqueItem[];
   onMovimentar: (item: EstoqueItem, tipo: TipoMovimentacao) => void;
+  onVerLotes: (item: EstoqueItem) => void;
 }) {
   return (
     <>
@@ -224,9 +256,6 @@ function ProdutoBloco({
             {item.embalagem}
           </td>
           <td className="px-4 py-2 text-neutral-500">{item.tipo}</td>
-          <td className="px-4 py-2 text-right text-neutral-500">
-            {item.capacidade ?? "—"}
-          </td>
           <td className="px-4 py-2 text-right">
             <span
               className={`inline-flex items-center gap-1 font-semibold tabular-nums ${
@@ -246,7 +275,17 @@ function ProdutoBloco({
             />
           </td>
           <td className="px-4 py-2">
+            <ValidadeBadge item={item} />
+          </td>
+          <td className="px-4 py-2">
             <div className="flex justify-end gap-2">
+              <button
+                onClick={() => onVerLotes(item)}
+                className="rounded-md border border-neutral-300 px-2.5 py-1 text-xs font-medium text-neutral-600 transition hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                title="Ver lotes"
+              >
+                Lotes
+              </button>
               <button
                 onClick={() => onMovimentar(item, "entrada")}
                 className="rounded-md bg-green-600 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-green-700"
@@ -265,6 +304,46 @@ function ProdutoBloco({
         </tr>
       ))}
     </>
+  );
+}
+
+function ValidadeBadge({ item }: { item: EstoqueItem }) {
+  if (!item.proxima_validade) {
+    return <span className="text-neutral-400">—</span>;
+  }
+  const cor = item.tem_vencido
+    ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
+    : item.vence_90
+      ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+      : "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400";
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${cor}`}>
+      {item.tem_vencido && "Vencido • "}
+      {formatarValidade(item.proxima_validade)}
+    </span>
+  );
+}
+
+function FiltroBtn({
+  ativo,
+  onClick,
+  children,
+}: {
+  ativo: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
+        ativo
+          ? "border-amber-500 bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200"
+          : "border-neutral-300 text-neutral-700 hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 

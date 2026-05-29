@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
-/** Registra uma entrada ou saída de estoque. */
+/** Registra uma entrada (com lote/validade) ou saída (FEFO) de estoque. */
 export async function registrarMovimentacao(
   _prev: ActionResult | null,
   formData: FormData,
@@ -21,38 +21,48 @@ export async function registrarMovimentacao(
     return { ok: false, error: "Dados inválidos." };
   }
   if (!Number.isInteger(quantidade) || quantidade <= 0) {
-    return {
-      ok: false,
-      error: "Quantidade deve ser um inteiro maior que zero.",
-    };
+    return { ok: false, error: "Quantidade deve ser um inteiro maior que zero." };
   }
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
 
-  const { error } = await supabase.from("movimentacoes").insert({
-    embalagem_id,
-    tipo,
-    quantidade,
-    motivo,
-    documento,
-    observacao,
-    usuario_id: user?.id ?? null,
-  });
+  if (tipo === "entrada") {
+    const codigo = String(formData.get("codigo") ?? "").trim() || null;
+    const validade = String(formData.get("validade") ?? "").trim() || null;
 
-  if (error) {
-    // O CHECK (quantidade >= 0) no banco impede estoque negativo.
-    const msg = error.message.includes("quantidade_check")
-      ? "Estoque insuficiente para esta saída."
-      : error.message;
-    return { ok: false, error: msg };
+    const { error } = await supabase.rpc("registrar_entrada", {
+      p_embalagem_id: embalagem_id,
+      p_quantidade: quantidade,
+      p_codigo: codigo,
+      p_validade: validade,
+      p_motivo: motivo,
+      p_documento: documento,
+      p_observacao: observacao,
+    });
+    if (error) return { ok: false, error: traduzErro(error.message) };
+  } else {
+    const { error } = await supabase.rpc("registrar_saida_fefo", {
+      p_embalagem_id: embalagem_id,
+      p_quantidade: quantidade,
+      p_motivo: motivo,
+      p_documento: documento,
+      p_observacao: observacao,
+    });
+    if (error) return { ok: false, error: traduzErro(error.message) };
   }
 
   revalidatePath("/");
   revalidatePath("/historico");
+  revalidatePath("/validade");
   return { ok: true };
+}
+
+function traduzErro(msg: string): string {
+  if (msg.includes("Estoque insuficiente")) return msg;
+  if (msg.toLowerCase().includes("could not find the function")) {
+    return "Funções de lote não encontradas. Rode a migração 002_fase2_lotes.sql no Supabase.";
+  }
+  return msg;
 }
 
 /** Atualiza o estoque mínimo de uma embalagem (alerta de reposição). */
@@ -133,37 +143,6 @@ export async function criarProduto(
     // Desfaz o produto para não deixar órfão sem embalagens.
     await supabase.from("produtos").delete().eq("id", produto.id);
     return { ok: false, error: errEmb.message };
-  }
-
-  revalidatePath("/");
-  return { ok: true };
-}
-
-/** Adiciona uma embalagem a um produto já existente. */
-export async function adicionarEmbalagem(
-  _prev: ActionResult | null,
-  formData: FormData,
-): Promise<ActionResult> {
-  const produto_id = String(formData.get("produto_id") ?? "");
-  const descricao = String(formData.get("descricao") ?? "").trim();
-  const estoque_minimo = Math.max(
-    0,
-    Math.trunc(Number(formData.get("estoque_minimo") ?? 0)) || 0,
-  );
-
-  if (!produto_id) return { ok: false, error: "Produto inválido." };
-  if (!descricao) return { ok: false, error: "Informe a descrição da embalagem." };
-
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("embalagens")
-    .insert({ produto_id, descricao, estoque_minimo });
-
-  if (error) {
-    const msg = error.message.includes("duplicate")
-      ? "Esse produto já tem uma embalagem com essa descrição."
-      : error.message;
-    return { ok: false, error: msg };
   }
 
   revalidatePath("/");

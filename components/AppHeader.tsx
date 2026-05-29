@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { logout } from "@/app/login/actions";
 
-/** Cabeçalho compartilhado com navegação entre Estoque e Histórico. */
+/** Cabeçalho compartilhado com navegação entre as telas. */
 export default function AppHeader({
   email,
   active,
 }: {
   email?: string;
-  active: "estoque" | "historico";
+  active: "estoque" | "historico" | "validade";
 }) {
   return (
     <header className="border-b border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
@@ -22,6 +22,11 @@ export default function AppHeader({
               href="/historico"
               label="Histórico"
               active={active === "historico"}
+            />
+            <NavLink
+              href="/validade"
+              label="Validade"
+              active={active === "validade"}
             />
           </nav>
         </div>

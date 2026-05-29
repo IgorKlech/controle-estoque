@@ -1,5 +1,5 @@
 import { createClient, hasSupabaseEnv } from "@/lib/supabase/server";
-import type { EstoqueItem } from "@/lib/types";
+import type { EstoqueItem, LoteItem } from "@/lib/types";
 import AppHeader from "@/components/AppHeader";
 import EstoqueClient from "@/components/EstoqueClient";
 
@@ -24,7 +24,15 @@ export default async function Home() {
     .select("*")
     .returns<EstoqueItem[]>();
 
+  // Lotes (para o detalhe por embalagem). Pode não existir se a migração 002
+  // ainda não foi aplicada — nesse caso seguimos sem lotes.
+  const { data: lotesData } = await supabase
+    .from("vw_lotes")
+    .select("*")
+    .returns<LoteItem[]>();
+
   const itens = data ?? [];
+  const lotes = lotesData ?? [];
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950">
@@ -34,11 +42,11 @@ export default async function Home() {
         {error ? (
           <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
             Erro ao carregar o estoque: {error.message}. Você já rodou o{" "}
-            <code>setup.sql</code> e a migração{" "}
-            <code>migrations/001_fase1.sql</code> no Supabase?
+            <code>setup.sql</code> e as migrações em{" "}
+            <code>supabase/migrations/</code> no Supabase?
           </p>
         ) : (
-          <EstoqueClient itens={itens} />
+          <EstoqueClient itens={itens} lotes={lotes} />
         )}
       </main>
     </div>
