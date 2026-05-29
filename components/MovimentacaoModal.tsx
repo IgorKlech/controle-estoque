@@ -3,7 +3,12 @@
 import { useActionState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
 import { registrarMovimentacao } from "@/app/actions";
-import type { EstoqueItem, TipoMovimentacao } from "@/lib/types";
+import {
+  MOTIVOS_ENTRADA,
+  MOTIVOS_SAIDA,
+  type EstoqueItem,
+  type TipoMovimentacao,
+} from "@/lib/types";
 
 export default function MovimentacaoModal({
   item,
@@ -21,6 +26,7 @@ export default function MovimentacaoModal({
   }, [state, onClose]);
 
   const ehEntrada = tipo === "entrada";
+  const motivos = ehEntrada ? MOTIVOS_ENTRADA : MOTIVOS_SAIDA;
 
   return (
     <div
@@ -59,8 +65,24 @@ export default function MovimentacaoModal({
               defaultValue={1}
               required
               autoFocus
-              className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-neutral-900 outline-none focus:border-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-50 dark:focus:border-neutral-400"
+              className={campo}
             />
+          </label>
+
+          <label className="flex flex-col gap-1 text-sm font-medium text-neutral-700 dark:text-neutral-300">
+            Motivo
+            <select name="motivo" defaultValue={motivos[0]} className={campo}>
+              {motivos.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-1 text-sm font-medium text-neutral-700 dark:text-neutral-300">
+            Documento (NF, ordem, cliente…)
+            <input type="text" name="documento" maxLength={80} className={campo} />
           </label>
 
           <label className="flex flex-col gap-1 text-sm font-medium text-neutral-700 dark:text-neutral-300">
@@ -69,7 +91,7 @@ export default function MovimentacaoModal({
               type="text"
               name="observacao"
               maxLength={200}
-              className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-neutral-900 outline-none focus:border-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-50 dark:focus:border-neutral-400"
+              className={campo}
             />
           </label>
 
@@ -94,6 +116,9 @@ export default function MovimentacaoModal({
     </div>
   );
 }
+
+const campo =
+  "rounded-lg border border-neutral-300 bg-white px-3 py-2 text-neutral-900 outline-none focus:border-neutral-900 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-50 dark:focus:border-neutral-400";
 
 function Submit({ ehEntrada }: { ehEntrada: boolean }) {
   const { pending } = useFormStatus();
