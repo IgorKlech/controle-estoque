@@ -1,47 +1,61 @@
-# Controle de Estoque
+# Inventory Control
 
-Sistema simples de controle de estoque (produtos, embalagens e movimentações de
-entrada/saída), feito com **Next.js + TypeScript + Tailwind**, banco no
-**Supabase** (Postgres + Auth) e deploy na **Vercel**.
+Inventory management system for products, packaging units and stock movements
+(inbound/outbound). Built with **Next.js + TypeScript + Tailwind**, backed by
+**Supabase** (Postgres + Auth) and deployed on **Vercel**.
 
-## Funcionalidades (v1)
+## Why it exists
 
-- Login / criação de conta (Supabase Auth)
-- Catálogo de produtos e embalagens (tipo + capacidade extraídos do nome)
-- Estoque atual por embalagem
-- Movimentações de **entrada** e **saída** (o estoque é atualizado por trigger no
-  banco, que impede estoque negativo)
-- Busca por produto/embalagem e resumo (totais)
+Stock movements needed to be traceable: not just knowing what left the warehouse,
+but which order or production run it left for. Every movement is tied to an order
+number or a production order, so any change in stock can be traced back to a real
+operation.
 
-## Estrutura
+## Features (v1)
+
+- Login / sign-up (Supabase Auth)
+- Catalogue of products and packaging units (type and capacity derived from the name)
+- Current stock per packaging unit
+- **Inbound** and **outbound** movements — stock is updated by a database trigger
+  that prevents negative balances
+- Movements linked to an order number or production order for traceability
+- Search by product/packaging and summary totals
+
+## Access control
+
+- User login required
+- Admin role with full edit permissions directly in the system
+- Row Level Security (RLS) policies enforced at the database level
+
+## Project structure
 
 ```
 app/
-  page.tsx              Painel de estoque (protegido)
-  actions.ts            Server action: registrar movimentação
-  login/                Tela e ações de login/cadastro/logout
+  page.tsx              Stock dashboard (protected route)
+  actions.ts            Server action: record a movement
+  login/                Login / sign-up / logout screens and actions
 components/
-  EstoqueClient.tsx     Lista, busca e resumo (client)
-  MovimentacaoModal.tsx Modal de entrada/saída (client)
-lib/supabase/           Clientes Supabase (browser, server, middleware)
-middleware.ts           Protege rotas (redireciona p/ /login sem sessão)
+  EstoqueClient.tsx     List, search and summary (client)
+  MovimentacaoModal.tsx Inbound/outbound modal (client)
+lib/supabase/           Supabase clients (browser, server, middleware)
+middleware.ts           Route protection (redirects to /login without a session)
 supabase/
-  schema.sql            Tabelas, trigger, view e políticas RLS
-  seed.sql              Produtos e embalagens iniciais (Lista 2)
+  schema.sql            Tables, trigger, view and RLS policies
+  seed.sql              Initial products and packaging units
 ```
 
-## Como rodar localmente
+## Running locally
 
-### 1. Criar o projeto no Supabase
+### 1. Create the Supabase project
 
-1. Crie um projeto em <https://supabase.com>.
-2. No **SQL Editor**, rode **`supabase/schema.sql`** e depois **`supabase/seed.sql`**.
-3. (Opcional) Em **Authentication > Providers > Email**, desative
-   "Confirm email" se quiser testar login sem precisar confirmar o e-mail.
+1. Create a project at <https://supabase.com>.
+2. In the **SQL Editor**, run **`supabase/schema.sql`**, then **`supabase/seed.sql`**.
+3. (Optional) Under **Authentication > Providers > Email**, disable
+   "Confirm email" to test sign-in without email confirmation.
 
-### 2. Variáveis de ambiente
+### 2. Environment variables
 
-Copie o exemplo e preencha com os dados do seu projeto
+Copy the example file and fill it in with your project credentials
 (**Project Settings > API**):
 
 ```bash
@@ -49,35 +63,39 @@ cp .env.local.example .env.local
 ```
 
 ```
-NEXT_PUBLIC_SUPABASE_URL=https://SEU-PROJETO.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=sua-anon-key-publica
+NEXT_PUBLIC_SUPABASE_URL=https://YOUR-PROJECT.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-public-anon-key
 ```
 
-### 3. Instalar e rodar
+### 3. Install and run
 
 ```bash
 npm install
 npm run dev
 ```
 
-Acesse <http://localhost:3000>. Você será redirecionado para `/login`. Crie uma
-conta e entre.
+Open <http://localhost:3000>. You'll be redirected to `/login` — create an
+account and sign in.
 
-## Deploy na Vercel
+## Deploying to Vercel
 
-1. Suba o repositório para o GitHub.
-2. Em <https://vercel.com>, importe o repositório.
-3. Adicione as duas variáveis de ambiente
-   (`NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY`).
+1. Push the repository to GitHub.
+2. Import the repository at <https://vercel.com>.
+3. Add both environment variables
+   (`NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`).
 4. Deploy.
 
-> Em **Supabase > Authentication > URL Configuration**, adicione a URL da Vercel
-> em *Site URL* / *Redirect URLs*.
+> In **Supabase > Authentication > URL Configuration**, add your Vercel URL
+> to *Site URL* / *Redirect URLs*.
 
-## Modelo de dados
+## Data model
 
 - **produtos** — `id`, `nome`
-- **embalagens** — `id`, `produto_id`, `descricao` (ex: "Bombona 25"), `tipo` e
-  `capacidade` (gerados a partir da descrição), `quantidade` (estoque atual)
-- **movimentacoes** — `id`, `embalagem_id`, `tipo` (entrada/saida), `quantidade`,
+- **embalagens** — `id`, `produto_id`, `descricao` (e.g. "Bombona 25"), `tipo` and
+  `capacidade` (derived from the description), `quantidade` (current stock)
+- **movimentacoes** — `id`, `embalagem_id`, `tipo` (inbound/outbound), `quantidade`,
   `observacao`, `usuario_id`, `created_at`
+
+## Status
+
+In production, used daily.
